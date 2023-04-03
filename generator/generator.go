@@ -1,11 +1,13 @@
 package generator
 
 import (
-	log "github.com/DragFAQ/uuid-generator/logger"
-	"github.com/google/uuid"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
+
+	log "github.com/DragFAQ/uuid-generator/logger"
 )
 
 type Hash struct {

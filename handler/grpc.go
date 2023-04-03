@@ -2,11 +2,12 @@ package handler
 
 import (
 	"context"
+	"sync"
+	"time"
+
 	generator "github.com/DragFAQ/uuid-generator/generator"
 	log "github.com/DragFAQ/uuid-generator/logger"
 	pb "github.com/DragFAQ/uuid-generator/proto"
-	"sync"
-	"time"
 )
 
 type GrpcHandler struct {

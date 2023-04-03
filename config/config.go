@@ -1,8 +1,9 @@
 package config
 
 import (
-	logger "github.com/DragFAQ/uuid-generator/logger"
 	"github.com/kelseyhightower/envconfig"
+
+	logger "github.com/DragFAQ/uuid-generator/logger"
 )
 
 type AppParams struct {

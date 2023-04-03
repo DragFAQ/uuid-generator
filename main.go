@@ -1,13 +1,6 @@
 package main
 
 import (
-	"github.com/DragFAQ/uuid-generator/config"
-	generator "github.com/DragFAQ/uuid-generator/generator"
-	"github.com/DragFAQ/uuid-generator/handler"
-	log "github.com/DragFAQ/uuid-generator/logger"
-	pb "github.com/DragFAQ/uuid-generator/proto"
-	"golang.org/x/net/context"
-	"google.golang.org/grpc"
 	"net"
 	"net/http"
 	"os"
@@ -17,6 +10,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/net/context"
+	"google.golang.org/grpc"
+
+	"github.com/DragFAQ/uuid-generator/config"
+	"github.com/DragFAQ/uuid-generator/generator"
+	"github.com/DragFAQ/uuid-generator/handler"
+	log "github.com/DragFAQ/uuid-generator/logger"
+	pb "github.com/DragFAQ/uuid-generator/proto"
 )
 
 var currentHash generator.Hash

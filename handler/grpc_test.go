@@ -2,22 +2,22 @@ package handler_test
 
 import (
 	"context"
-	mock_log "github.com/DragFAQ/uuid-generator/mocks"
-	"github.com/golang/mock/gomock"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/DragFAQ/uuid-generator/generator"
-	pb "github.com/DragFAQ/uuid-generator/proto"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/DragFAQ/uuid-generator/generator"
 	"github.com/DragFAQ/uuid-generator/handler"
+	mocklog "github.com/DragFAQ/uuid-generator/mocks"
+	pb "github.com/DragFAQ/uuid-generator/proto"
 )
 
 func TestNewGrpcHandler(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	mock_logger := mock_log.NewMockLogger(ctrl)
+	mock_logger := mocklog.NewMockLogger(ctrl)
 	hash := "test-hash"
 	timestamp := time.Now()
 	currentHash := &generator.Hash{
@@ -33,7 +33,7 @@ func TestNewGrpcHandler(t *testing.T) {
 
 func TestGrpcGetCurrentHash(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	mock_logger := mock_log.NewMockLogger(ctrl)
+	mock_logger := mocklog.NewMockLogger(ctrl)
 	hash := "test-hash"
 	timestamp := time.Now()
 	currentHash := &generator.Hash{

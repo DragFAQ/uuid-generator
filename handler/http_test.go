@@ -1,7 +1,6 @@
 package handler_test
 
 import (
-	mock_log "github.com/DragFAQ/uuid-generator/mocks"
 	"github.com/golang/mock/gomock"
 	"net/http"
 	"net/http/httptest"
@@ -9,15 +8,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DragFAQ/uuid-generator/generator"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/DragFAQ/uuid-generator/generator"
 	"github.com/DragFAQ/uuid-generator/handler"
+	mocklog "github.com/DragFAQ/uuid-generator/mocks"
 )
 
 func TestNewHttpHandler(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	mock_logger := mock_log.NewMockLogger(ctrl)
+	mock_logger := mocklog.NewMockLogger(ctrl)
 	hash := "test-hash"
 	timestamp := time.Now()
 	currentHash := &generator.Hash{
@@ -33,7 +33,7 @@ func TestNewHttpHandler(t *testing.T) {
 
 func TestHttpGetCurrentHash(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	mock_logger := mock_log.NewMockLogger(ctrl)
+	mock_logger := mocklog.NewMockLogger(ctrl)
 	hash := "test-hash"
 	timestamp := time.Now()
 	currentHash := &generator.Hash{

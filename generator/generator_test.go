@@ -1,24 +1,25 @@
 package generator_test
 
 import (
-	mock_log "github.com/DragFAQ/uuid-generator/mocks"
-	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"sync"
 	"syscall"
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/DragFAQ/uuid-generator/generator"
+	mocklog "github.com/DragFAQ/uuid-generator/mocks"
 )
 
 func TestGenerate(t *testing.T) {
 	hashLock := &sync.RWMutex{}
 	ctrl := gomock.NewController(t)
 
-	mock_logger := mock_log.NewMockLogger(ctrl)
+	mock_logger := mocklog.NewMockLogger(ctrl)
 	mock_logger.EXPECT().Debugf("%s: New UUID was generated '%s'", gomock.Any(), gomock.Any()).AnyTimes()
 	mock_logger.EXPECT().Infof("GenerateHash worker stopped.").AnyTimes()
 
@@ -50,7 +51,7 @@ func TestChangedValAfterTTL(t *testing.T) {
 	hashLock := &sync.RWMutex{}
 	ctrl := gomock.NewController(t)
 
-	mock_logger := mock_log.NewMockLogger(ctrl)
+	mock_logger := mocklog.NewMockLogger(ctrl)
 	mock_logger.EXPECT().Debugf("%s: New UUID was generated '%s'", gomock.Any(), gomock.Any()).AnyTimes()
 	mock_logger.EXPECT().Infof("GenerateHash worker stopped.").AnyTimes()
 
@@ -82,7 +83,7 @@ func TestNotChangedBeforeTTL(t *testing.T) {
 	hashLock := &sync.RWMutex{}
 	ctrl := gomock.NewController(t)
 
-	mock_logger := mock_log.NewMockLogger(ctrl)
+	mock_logger := mocklog.NewMockLogger(ctrl)
 	mock_logger.EXPECT().Debugf("%s: New UUID was generated '%s'", gomock.Any(), gomock.Any()).AnyTimes()
 	mock_logger.EXPECT().Infof("GenerateHash worker stopped.").AnyTimes()
 
@@ -112,7 +113,7 @@ func TestGenerateWhileLock(t *testing.T) {
 	hashLock := &sync.RWMutex{}
 	ctrl := gomock.NewController(t)
 
-	mock_logger := mock_log.NewMockLogger(ctrl)
+	mock_logger := mocklog.NewMockLogger(ctrl)
 	mock_logger.EXPECT().Debugf("%s: New UUID was generated '%s'", gomock.Any(), gomock.Any()).AnyTimes()
 	mock_logger.EXPECT().Infof("GenerateHash worker stopped.").AnyTimes()
 
@@ -141,7 +142,7 @@ func TestNotChangedWhileLock(t *testing.T) {
 	hashLock := &sync.RWMutex{}
 	ctrl := gomock.NewController(t)
 
-	mock_logger := mock_log.NewMockLogger(ctrl)
+	mock_logger := mocklog.NewMockLogger(ctrl)
 	mock_logger.EXPECT().Debugf("%s: New UUID was generated '%s'", gomock.Any(), gomock.Any()).AnyTimes()
 	mock_logger.EXPECT().Infof("GenerateHash worker stopped.").AnyTimes()
 

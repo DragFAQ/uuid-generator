@@ -2,11 +2,12 @@ package handler
 
 import (
 	"encoding/json"
-	hash "github.com/DragFAQ/uuid-generator/generator"
-	log "github.com/DragFAQ/uuid-generator/logger"
 	"net/http"
 	"sync"
 	"time"
+
+	hash "github.com/DragFAQ/uuid-generator/generator"
+	log "github.com/DragFAQ/uuid-generator/logger"
 )
 
 type HttpHandler struct {
