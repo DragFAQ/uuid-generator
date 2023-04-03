@@ -3,6 +3,7 @@ package generator
 import (
 	log "github.com/DragFAQ/uuid-generator/logger"
 	"github.com/google/uuid"
+	"os"
 	"sync"
 	"time"
 )
@@ -12,16 +13,23 @@ type Hash struct {
 	GenerationTime time.Time
 }
 
-func GenerateHash(currentHash *Hash, hashLock *sync.RWMutex, logger log.Logger, ttlSeconds int) {
+func GenerateHash(currentHash *Hash, hashLock *sync.RWMutex, logger log.Logger, ttlSeconds int, shutDownCh <-chan os.Signal, wg *sync.WaitGroup) {
+	defer wg.Done()
 	for {
-		time.Sleep(time.Duration(ttlSeconds) * time.Second)
-		newHash := Hash{
-			Value:          uuid.New().String(),
-			GenerationTime: time.Now(),
+		select {
+		case <-shutDownCh:
+			logger.Infof("GenerateHash worker stopped.")
+			return
+		default:
+			time.Sleep(time.Duration(ttlSeconds) * time.Second)
+			newHash := Hash{
+				Value:          uuid.New().String(),
+				GenerationTime: time.Now(),
+			}
+			hashLock.Lock()
+			*currentHash = newHash
+			logger.Debugf("%s: New UUID was generated '%s'", newHash.GenerationTime, newHash.Value)
+			hashLock.Unlock()
 		}
-		hashLock.Lock()
-		*currentHash = newHash
-		logger.Debugf("%s: New UUID was generated '%s'", newHash.GenerationTime, newHash.Value)
-		hashLock.Unlock()
 	}
 }
