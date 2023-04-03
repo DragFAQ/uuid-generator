@@ -20,13 +20,12 @@ import (
 	pb "github.com/DragFAQ/uuid-generator/proto"
 )
 
-var currentHash generator.Hash
-var hashLock sync.RWMutex
+const shutdownTimeout = 10 * time.Second
 
 var (
-	shutDownCh     = make(chan os.Signal, 1)
-	mainShutCh     = make(chan os.Signal, 1)
-	generateShutCh = make(chan os.Signal, 1)
+	currentHash generator.Hash
+	hashLock    sync.RWMutex
+	wg          sync.WaitGroup
 )
 
 func failOnError(logger log.Logger, err error, msg string) {
@@ -35,15 +34,26 @@ func failOnError(logger log.Logger, err error, msg string) {
 	}
 }
 
-func SetupShutdownHardware() sync.WaitGroup {
-	signal.Notify(shutDownCh, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
+func setUpSignalHandler(logger log.Logger, httpServer *http.Server, grpcServer *grpc.Server) {
+	signalCh := make(chan os.Signal, 1)
+	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	go func() {
-		for sig := range shutDownCh {
-			mainShutCh <- sig
-			generateShutCh <- sig
-		}
+		sig := <-signalCh
+		logger.Infof("shutting down (%v)", sig)
+
+		ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+
+		err := httpServer.Shutdown(ctx)
+		failOnError(logger, err, "failed to shut down HTTP server")
+
+		grpcServer.GracefulStop()
+		wg.Wait()
+
+		close(signalCh)
+		logger.Infof("program terminated gracefully")
+		os.Exit(0)
 	}()
-	return sync.WaitGroup{}
 }
 
 func main() {
@@ -60,50 +70,40 @@ func main() {
 		GenerationTime: time.Now(),
 	}
 
-	wg := SetupShutdownHardware()
+	generateCh := make(chan os.Signal, 1)
+	signal.Notify(generateCh, syscall.SIGINT, syscall.SIGTERM)
 
-	// Launch goroutine with worker function
 	wg.Add(1)
-	go generator.GenerateHash(&currentHash, &hashLock, logger, conf.Settings.HashTTLSeconds, generateShutCh, &wg)
+	go generator.GenerateHash(&currentHash, &hashLock, logger, conf.Settings.HashTTLSeconds, generateCh, &wg)
 
 	// Define the HTTP API routes
 	httpHandler := handler.NewHttpHandler(&currentHash, &hashLock, logger)
 	http.HandleFunc("/", httpHandler.GetCurrentHash)
-	srv := &http.Server{Addr: ":" + conf.Server.HttpPort}
 
+	httpServer := &http.Server{Addr: ":" + conf.Server.HttpPort}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := srv.ListenAndServe()
+		err := httpServer.ListenAndServe()
 		failOnError(logger, err, "Failed to start HTTP server")
 	}()
 
 	// Define the gRPC server
 	grpcServer := grpc.NewServer()
+
 	grpcHandler := handler.NewGrpcHandler(&currentHash, &hashLock, logger)
 	pb.RegisterHashServiceServer(grpcServer, grpcHandler)
+
+	listener, err := net.Listen("tcp", ":"+conf.Server.GrpcPort)
+	failOnError(logger, err, "Failed to listen port")
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		listener, err := net.Listen("tcp", ":"+conf.Server.GrpcPort)
-		failOnError(logger, err, "Failed to listen port")
-
 		err = grpcServer.Serve(listener)
 		failOnError(logger, err, "Failed to start GRPC server")
 	}()
 
-	<-mainShutCh
-	logger.Infof("Shutting down...")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	err = srv.Shutdown(ctx)
-	failOnError(logger, err, "failed to shut down HTTP server")
-
-	grpcServer.GracefulStop()
-	wg.Wait()
-	close(shutDownCh)
-	logger.Infof("Program terminated gracefully.")
+	setUpSignalHandler(logger, httpServer, grpcServer)
+	select {}
 }
