@@ -21,6 +21,8 @@ Generally, this app could be contained in just one small main.go file, especiall
 
 ## How to run
 
+In project root create your own .env file (based on [env.example](env.example))
+
 To make clean production build and run it locally:
 ```shell
 docker-compose up --build uuid-generator
@@ -35,3 +37,8 @@ To run tests:
 ```shell
 go test -v -coverprofile=coverage.out ./...
 ```
+
+## Use
+For HTTP endpoint call http://localhost:8080
+
+For GRPC call grpc://localhost:8090 rpc GetCurrentHash
