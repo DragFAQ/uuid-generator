@@ -1,0 +1,36 @@
+version: "3"
+
+services:
+  uuid-generator:
+    build:
+      context: .
+    user: root
+    command: ["sh","-c","./uuid-generator run"]
+    ports:
+      - "8080:8080"
+      - "8090:8090"
+    env_file:
+      - .env
+    networks:
+      - public
+
+  uuid-generator-debug:
+    build:
+      args:
+        mode: "debug"
+      context: .
+    user: root
+    command: [ "sh", "-c", "dlv --listen=:40000 --headless=true --api-version=2 --accept-multiclient exec ./uuid-generator run" ]
+    ports:
+      - "8080:8080"
+      - "8090:8090"
+      - "40000:40000"
+    env_file:
+      - .env
+    networks:
+      - public
+
+networks:
+  public:
+    external:
+      name: public
