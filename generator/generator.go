@@ -16,13 +16,14 @@ type Hash struct {
 }
 
 func GenerateHash(currentHash *Hash, hashLock *sync.RWMutex, logger log.Logger, ttlSeconds int, quit context.Context) {
+	ticker := time.NewTicker(time.Duration(ttlSeconds) * time.Second)
+
 	for {
 		select {
 		case <-quit.Done():
 			logger.Infof("GenerateHash worker stopped.")
 			return
-		default:
-			time.Sleep(time.Duration(ttlSeconds) * time.Second)
+		case <-ticker.C:
 			newHash := Hash{
 				Value:          uuid.New().String(),
 				GenerationTime: time.Now(),
