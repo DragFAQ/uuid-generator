@@ -1,7 +1,7 @@
 package generator
 
 import (
-	"os"
+	"context"
 	"sync"
 	"time"
 
@@ -15,11 +15,10 @@ type Hash struct {
 	GenerationTime time.Time
 }
 
-func GenerateHash(currentHash *Hash, hashLock *sync.RWMutex, logger log.Logger, ttlSeconds int, shutDownCh <-chan os.Signal, wg *sync.WaitGroup) {
-	defer wg.Done()
+func GenerateHash(currentHash *Hash, hashLock *sync.RWMutex, logger log.Logger, ttlSeconds int, quit context.Context) {
 	for {
 		select {
-		case <-shutDownCh:
+		case <-quit.Done():
 			logger.Infof("GenerateHash worker stopped.")
 			return
 		default:

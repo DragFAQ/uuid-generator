@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/spf13/cobra"
+	"errors"
 	"net"
 	"net/http"
 	"os"
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
@@ -21,43 +22,68 @@ import (
 	pb "github.com/DragFAQ/uuid-generator/proto"
 )
 
-const shutdownTimeout = 10 * time.Second
-
 var (
 	currentHash generator.Hash
 	hashLock    sync.RWMutex
-	wg          sync.WaitGroup
 )
 
 func failOnError(logger log.Logger, err error, msg string) {
-	if err != nil && err != http.ErrServerClosed {
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		logger.Panicf("%s: %s", msg, err)
 	}
 }
 
-func setUpSignalHandler(logger log.Logger, httpServer *http.Server, grpcServer *grpc.Server) {
-	signalCh := make(chan os.Signal, 1)
-	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
+func setUpSignalHandler(ctx context.Context, wg *sync.WaitGroup, logger log.Logger, httpServer *http.Server, grpcServer *grpc.Server, cancel context.CancelFunc) {
+	wg.Add(1)
 	go func() {
-		sig := <-signalCh
+		stop := make(chan os.Signal, 1)
+		signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
+		sig := <-stop
 		logger.Infof("shutting down (%v)", sig)
-
-		ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
-		defer cancel()
 
 		err := httpServer.Shutdown(ctx)
 		failOnError(logger, err, "failed to shut down HTTP server")
-
 		grpcServer.GracefulStop()
-		wg.Wait()
-
-		close(signalCh)
-		logger.Infof("program terminated gracefully")
-		os.Exit(0)
+		cancel()
+		wg.Done()
 	}()
 }
 
-// Run main cmd action
+func startHTTPServer(wg *sync.WaitGroup, port string, logger log.Logger) *http.Server {
+	httpHandler := handler.NewHttpHandler(&currentHash, &hashLock, logger)
+	http.HandleFunc("/", httpHandler.GetCurrentHash)
+
+	srv := &http.Server{Addr: ":" + port}
+	go func() {
+		defer wg.Done()
+
+		err := srv.ListenAndServe()
+		failOnError(logger, err, "Failed to start HTTP server")
+	}()
+
+	return srv
+}
+
+func startGRPCServer(wg *sync.WaitGroup, port string, logger log.Logger) *grpc.Server {
+	srv := grpc.NewServer()
+
+	grpcHandler := handler.NewGrpcHandler(&currentHash, &hashLock, logger)
+	pb.RegisterHashServiceServer(srv, grpcHandler)
+
+	listener, err := net.Listen("tcp", ":"+port)
+	failOnError(logger, err, "Failed to listen port")
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		err = srv.Serve(listener)
+		failOnError(logger, err, "Failed to start GRPC server")
+	}()
+
+	return srv
+}
+
 func Run() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run",
@@ -77,42 +103,23 @@ func Run() *cobra.Command {
 				GenerationTime: time.Now(),
 			}
 
-			generateCh := make(chan os.Signal, 1)
-			signal.Notify(generateCh, syscall.SIGINT, syscall.SIGTERM)
+			ctx, cancel := context.WithCancel(context.Background())
 
-			wg.Add(1)
-			go generator.GenerateHash(&currentHash, &hashLock, logger, conf.Settings.HashTTLSeconds, generateCh, &wg)
-
-			// Define the HTTP API routes
-			httpHandler := handler.NewHttpHandler(&currentHash, &hashLock, logger)
-			http.HandleFunc("/", httpHandler.GetCurrentHash)
-
-			httpServer := &http.Server{Addr: ":" + conf.Server.HttpPort}
+			wg := &sync.WaitGroup{}
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err := httpServer.ListenAndServe()
-				failOnError(logger, err, "Failed to start HTTP server")
+				generator.GenerateHash(&currentHash, &hashLock, logger, conf.Settings.HashTTLSeconds, ctx)
 			}()
 
-			// Define the gRPC server
-			grpcServer := grpc.NewServer()
+			httpServer := startHTTPServer(wg, conf.Server.HttpPort, logger)
 
-			grpcHandler := handler.NewGrpcHandler(&currentHash, &hashLock, logger)
-			pb.RegisterHashServiceServer(grpcServer, grpcHandler)
+			grpcServer := startGRPCServer(wg, conf.Server.GrpcPort, logger)
 
-			listener, err := net.Listen("tcp", ":"+conf.Server.GrpcPort)
-			failOnError(logger, err, "Failed to listen port")
+			setUpSignalHandler(ctx, wg, logger, httpServer, grpcServer, cancel)
 
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				err = grpcServer.Serve(listener)
-				failOnError(logger, err, "Failed to start GRPC server")
-			}()
-
-			setUpSignalHandler(logger, httpServer, grpcServer)
-			select {}
+			wg.Wait()
+			logger.Infof("program terminated gracefully")
 		},
 	}
 

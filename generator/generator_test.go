@@ -1,9 +1,8 @@
 package generator_test
 
 import (
-	"os"
+	"context"
 	"sync"
-	"syscall"
 	"testing"
 	"time"
 
@@ -24,10 +23,8 @@ func TestGenerate(t *testing.T) {
 	mock_logger.EXPECT().Infof("GenerateHash worker stopped.").AnyTimes()
 
 	currentHash := &generator.Hash{}
-	shutDownCh := make(chan os.Signal, 1)
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go generator.GenerateHash(currentHash, hashLock, mock_logger, 1, shutDownCh, &wg)
+	ctx, cancel := context.WithCancel(context.Background())
+	go generator.GenerateHash(currentHash, hashLock, mock_logger, 1, ctx)
 
 	time.Sleep(1100 * time.Millisecond)
 
@@ -43,7 +40,7 @@ func TestGenerate(t *testing.T) {
 
 	assert.Equal(t, tim.IsZero(), false)
 
-	shutDownCh <- syscall.SIGTERM
+	cancel()
 	time.Sleep(100 * time.Millisecond)
 }
 
@@ -56,10 +53,8 @@ func TestChangedValAfterTTL(t *testing.T) {
 	mock_logger.EXPECT().Infof("GenerateHash worker stopped.").AnyTimes()
 
 	currentHash := &generator.Hash{}
-	shutDownCh := make(chan os.Signal, 1)
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go generator.GenerateHash(currentHash, hashLock, mock_logger, 1, shutDownCh, &wg)
+	ctx, cancel := context.WithCancel(context.Background())
+	go generator.GenerateHash(currentHash, hashLock, mock_logger, 1, ctx)
 
 	time.Sleep(1100 * time.Millisecond)
 
@@ -75,7 +70,7 @@ func TestChangedValAfterTTL(t *testing.T) {
 	assert.NotEqual(t, firstVal, currentHash.Value)
 	hashLock.RUnlock()
 
-	shutDownCh <- syscall.SIGTERM
+	cancel()
 	time.Sleep(100 * time.Millisecond)
 }
 
@@ -88,10 +83,8 @@ func TestNotChangedBeforeTTL(t *testing.T) {
 	mock_logger.EXPECT().Infof("GenerateHash worker stopped.").AnyTimes()
 
 	currentHash := &generator.Hash{}
-	shutDownCh := make(chan os.Signal, 1)
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go generator.GenerateHash(currentHash, hashLock, mock_logger, 1, shutDownCh, &wg)
+	ctx, cancel := context.WithCancel(context.Background())
+	go generator.GenerateHash(currentHash, hashLock, mock_logger, 1, ctx)
 
 	time.Sleep(1100 * time.Millisecond)
 
@@ -105,7 +98,7 @@ func TestNotChangedBeforeTTL(t *testing.T) {
 	assert.Equal(t, firstVal, currentHash.Value)
 	hashLock.RUnlock()
 
-	shutDownCh <- syscall.SIGTERM
+	cancel()
 	time.Sleep(100 * time.Millisecond)
 }
 
@@ -118,10 +111,8 @@ func TestGenerateWhileLock(t *testing.T) {
 	mock_logger.EXPECT().Infof("GenerateHash worker stopped.").AnyTimes()
 
 	currentHash := &generator.Hash{}
-	shutDownCh := make(chan os.Signal, 1)
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go generator.GenerateHash(currentHash, hashLock, mock_logger, 1, shutDownCh, &wg)
+	ctx, cancel := context.WithCancel(context.Background())
+	go generator.GenerateHash(currentHash, hashLock, mock_logger, 1, ctx)
 
 	time.Sleep(1100 * time.Millisecond)
 
@@ -134,7 +125,7 @@ func TestGenerateWhileLock(t *testing.T) {
 	assert.NotEqual(t, firstVal, currentHash.Value)
 	hashLock.RUnlock()
 
-	shutDownCh <- syscall.SIGTERM
+	cancel()
 	time.Sleep(100 * time.Millisecond)
 }
 
@@ -147,10 +138,8 @@ func TestNotChangedWhileLock(t *testing.T) {
 	mock_logger.EXPECT().Infof("GenerateHash worker stopped.").AnyTimes()
 
 	currentHash := &generator.Hash{}
-	shutDownCh := make(chan os.Signal, 1)
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go generator.GenerateHash(currentHash, hashLock, mock_logger, 1, shutDownCh, &wg)
+	ctx, cancel := context.WithCancel(context.Background())
+	go generator.GenerateHash(currentHash, hashLock, mock_logger, 1, ctx)
 
 	time.Sleep(1100 * time.Millisecond)
 
@@ -160,6 +149,6 @@ func TestNotChangedWhileLock(t *testing.T) {
 	assert.Equal(t, firstVal, currentHash.Value)
 	hashLock.RUnlock()
 
-	shutDownCh <- syscall.SIGTERM
+	cancel()
 	time.Sleep(100 * time.Millisecond)
 }
