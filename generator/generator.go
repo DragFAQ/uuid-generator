@@ -15,8 +15,24 @@ type Hash struct {
 	GenerationTime time.Time
 }
 
-func GenerateHash(currentHash *Hash, hashLock *sync.RWMutex, logger log.Logger, ttlSeconds int, quit context.Context) {
+var (
+	currentHash Hash
+	hashLock    sync.RWMutex
+)
+
+func GetHash() Hash {
+	hashLock.RLock()
+	defer hashLock.RUnlock()
+
+	return currentHash
+}
+
+func GenerateHash(quit context.Context, logger log.Logger, ttlSeconds int) {
 	ticker := time.NewTicker(time.Duration(ttlSeconds) * time.Second)
+	currentHash = Hash{
+		Value:          uuid.New().String(),
+		GenerationTime: time.Now(),
+	}
 
 	for {
 		select {
@@ -29,7 +45,7 @@ func GenerateHash(currentHash *Hash, hashLock *sync.RWMutex, logger log.Logger, 
 				GenerationTime: time.Now(),
 			}
 			hashLock.Lock()
-			*currentHash = newHash
+			currentHash = newHash
 			logger.Debugf("%s: New UUID was generated '%s'", newHash.GenerationTime, newHash.Value)
 			hashLock.Unlock()
 		}

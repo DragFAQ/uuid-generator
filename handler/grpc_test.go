@@ -2,9 +2,7 @@ package handler_test
 
 import (
 	"context"
-	"sync"
 	"testing"
-	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -18,15 +16,7 @@ import (
 func TestNewGrpcHandler(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mock_logger := mocklog.NewMockLogger(ctrl)
-	hash := "test-hash"
-	timestamp := time.Now()
-	currentHash := &generator.Hash{
-		Value:          hash,
-		GenerationTime: timestamp,
-	}
-	hashLock := sync.RWMutex{}
-
-	handl := handler.NewGrpcHandler(currentHash, &hashLock, mock_logger)
+	handl := handler.NewGrpcHandler(mock_logger)
 
 	assert.NotNil(t, handl)
 }
@@ -34,18 +24,11 @@ func TestNewGrpcHandler(t *testing.T) {
 func TestGrpcGetCurrentHash(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mock_logger := mocklog.NewMockLogger(ctrl)
-	hash := "test-hash"
-	timestamp := time.Now()
-	currentHash := &generator.Hash{
-		Value:          hash,
-		GenerationTime: timestamp,
-	}
-	hashLock := sync.RWMutex{}
-	handl := handler.NewGrpcHandler(currentHash, &hashLock, mock_logger)
+	currentHash := generator.GetHash()
+	handl := handler.NewGrpcHandler(mock_logger)
 
 	response, err := handl.GetCurrentHash(context.Background(), &pb.HashRequest{})
 
 	assert.NoError(t, err)
-	assert.Equal(t, response.Hash, hash)
-	assert.Equal(t, response.GenerationTime, timestamp.Format(time.RFC3339))
+	assert.Equal(t, response.Hash, currentHash.Value)
 }

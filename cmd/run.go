@@ -10,7 +10,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -20,11 +19,6 @@ import (
 	"github.com/DragFAQ/uuid-generator/handler"
 	log "github.com/DragFAQ/uuid-generator/logger"
 	pb "github.com/DragFAQ/uuid-generator/proto"
-)
-
-var (
-	currentHash generator.Hash
-	hashLock    sync.RWMutex
 )
 
 func failOnError(logger log.Logger, err error, msg string) {
@@ -48,7 +42,7 @@ func setUpSignalHandler(ctx context.Context, wg *sync.WaitGroup, logger log.Logg
 }
 
 func startHTTPServer(wg *sync.WaitGroup, port string, logger log.Logger, stop chan os.Signal) *http.Server {
-	httpHandler := handler.NewHttpHandler(&currentHash, &hashLock, logger)
+	httpHandler := handler.NewHttpHandler(logger)
 	http.HandleFunc("/", httpHandler.GetCurrentHash)
 
 	srv := &http.Server{Addr: ":" + port}
@@ -67,7 +61,7 @@ func startHTTPServer(wg *sync.WaitGroup, port string, logger log.Logger, stop ch
 func startGRPCServer(wg *sync.WaitGroup, port string, logger log.Logger, stop chan os.Signal) *grpc.Server {
 	srv := grpc.NewServer()
 
-	grpcHandler := handler.NewGrpcHandler(&currentHash, &hashLock, logger)
+	grpcHandler := handler.NewGrpcHandler(logger)
 	pb.RegisterHashServiceServer(srv, grpcHandler)
 
 	listener, err := net.Listen("tcp", ":"+port)
@@ -98,12 +92,6 @@ func Run() *cobra.Command {
 
 			logger.Infof("starting service on %v", time.Now())
 
-			// Start generating the initial hash
-			currentHash = generator.Hash{
-				Value:          uuid.New().String(),
-				GenerationTime: time.Now(),
-			}
-
 			ctx, cancel := context.WithCancel(context.Background())
 			stop := make(chan os.Signal, 4)
 			signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
@@ -112,7 +100,7 @@ func Run() *cobra.Command {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				generator.GenerateHash(&currentHash, &hashLock, logger, conf.Settings.HashTTLSeconds, ctx)
+				generator.GenerateHash(ctx, logger, conf.Settings.HashTTLSeconds)
 				stop <- os.Kill
 			}()
 

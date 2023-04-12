@@ -2,7 +2,6 @@ package generator_test
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
 
@@ -15,139 +14,73 @@ import (
 )
 
 func TestGenerate(t *testing.T) {
-	hashLock := &sync.RWMutex{}
 	ctrl := gomock.NewController(t)
 
 	mock_logger := mocklog.NewMockLogger(ctrl)
 	mock_logger.EXPECT().Debugf("%s: New UUID was generated '%s'", gomock.Any(), gomock.Any()).AnyTimes()
 	mock_logger.EXPECT().Infof("GenerateHash worker stopped.").AnyTimes()
 
-	currentHash := &generator.Hash{}
 	ctx, cancel := context.WithCancel(context.Background())
-	go generator.GenerateHash(currentHash, hashLock, mock_logger, 1, ctx)
+	go generator.GenerateHash(ctx, mock_logger, 1)
 
 	time.Sleep(1100 * time.Millisecond)
 
-	hashLock.RLock()
-	val := currentHash.Value
-	tim := currentHash.GenerationTime
-	hashLock.RUnlock()
+	first := generator.GetHash()
 
-	assert.NotEmpty(t, val)
+	assert.NotEmpty(t, first.Value)
 
-	_, err := uuid.Parse(val)
+	_, err := uuid.Parse(first.Value)
 	assert.NoError(t, err)
 
-	assert.Equal(t, tim.IsZero(), false)
+	assert.Equal(t, first.GenerationTime.IsZero(), false)
 
 	cancel()
 	time.Sleep(100 * time.Millisecond)
 }
 
 func TestChangedValAfterTTL(t *testing.T) {
-	hashLock := &sync.RWMutex{}
 	ctrl := gomock.NewController(t)
 
 	mock_logger := mocklog.NewMockLogger(ctrl)
 	mock_logger.EXPECT().Debugf("%s: New UUID was generated '%s'", gomock.Any(), gomock.Any()).AnyTimes()
 	mock_logger.EXPECT().Infof("GenerateHash worker stopped.").AnyTimes()
 
-	currentHash := &generator.Hash{}
 	ctx, cancel := context.WithCancel(context.Background())
-	go generator.GenerateHash(currentHash, hashLock, mock_logger, 1, ctx)
+	go generator.GenerateHash(ctx, mock_logger, 1)
 
 	time.Sleep(1100 * time.Millisecond)
 
-	hashLock.RLock()
-	firstVal := currentHash.Value
-	hashLock.RUnlock()
+	first := generator.GetHash()
 
-	assert.NotEmpty(t, firstVal)
+	assert.NotEmpty(t, first.Value)
 
 	time.Sleep(1100 * time.Millisecond)
 
-	hashLock.RLock()
-	assert.NotEqual(t, firstVal, currentHash.Value)
-	hashLock.RUnlock()
+	second := generator.GetHash()
+	assert.NotEqual(t, first.Value, second.Value)
 
 	cancel()
 	time.Sleep(100 * time.Millisecond)
 }
 
 func TestNotChangedBeforeTTL(t *testing.T) {
-	hashLock := &sync.RWMutex{}
 	ctrl := gomock.NewController(t)
 
 	mock_logger := mocklog.NewMockLogger(ctrl)
 	mock_logger.EXPECT().Debugf("%s: New UUID was generated '%s'", gomock.Any(), gomock.Any()).AnyTimes()
 	mock_logger.EXPECT().Infof("GenerateHash worker stopped.").AnyTimes()
 
-	currentHash := &generator.Hash{}
 	ctx, cancel := context.WithCancel(context.Background())
-	go generator.GenerateHash(currentHash, hashLock, mock_logger, 1, ctx)
+	go generator.GenerateHash(ctx, mock_logger, 1)
 
 	time.Sleep(1100 * time.Millisecond)
 
-	hashLock.RLock()
-	firstVal := currentHash.Value
-	hashLock.RUnlock()
+	first := generator.GetHash()
 
 	time.Sleep(500 * time.Millisecond)
 
-	hashLock.RLock()
-	assert.Equal(t, firstVal, currentHash.Value)
-	hashLock.RUnlock()
-
-	cancel()
-	time.Sleep(100 * time.Millisecond)
-}
-
-func TestGenerateWhileLock(t *testing.T) {
-	hashLock := &sync.RWMutex{}
-	ctrl := gomock.NewController(t)
-
-	mock_logger := mocklog.NewMockLogger(ctrl)
-	mock_logger.EXPECT().Debugf("%s: New UUID was generated '%s'", gomock.Any(), gomock.Any()).AnyTimes()
-	mock_logger.EXPECT().Infof("GenerateHash worker stopped.").AnyTimes()
-
-	currentHash := &generator.Hash{}
-	ctx, cancel := context.WithCancel(context.Background())
-	go generator.GenerateHash(currentHash, hashLock, mock_logger, 1, ctx)
-
-	time.Sleep(1100 * time.Millisecond)
-
-	hashLock.RLock()
-	firstVal := currentHash.Value
-	time.Sleep(1100 * time.Millisecond)
-	hashLock.RUnlock()
-
-	hashLock.RLock()
-	assert.NotEqual(t, firstVal, currentHash.Value)
-	hashLock.RUnlock()
-
-	cancel()
-	time.Sleep(100 * time.Millisecond)
-}
-
-func TestNotChangedWhileLock(t *testing.T) {
-	hashLock := &sync.RWMutex{}
-	ctrl := gomock.NewController(t)
-
-	mock_logger := mocklog.NewMockLogger(ctrl)
-	mock_logger.EXPECT().Debugf("%s: New UUID was generated '%s'", gomock.Any(), gomock.Any()).AnyTimes()
-	mock_logger.EXPECT().Infof("GenerateHash worker stopped.").AnyTimes()
-
-	currentHash := &generator.Hash{}
-	ctx, cancel := context.WithCancel(context.Background())
-	go generator.GenerateHash(currentHash, hashLock, mock_logger, 1, ctx)
-
-	time.Sleep(1100 * time.Millisecond)
-
-	hashLock.RLock()
-	firstVal := currentHash.Value
-	time.Sleep(1100 * time.Millisecond)
-	assert.Equal(t, firstVal, currentHash.Value)
-	hashLock.RUnlock()
+	second := generator.GetHash()
+	assert.Equal(t, first.Value, second.Value)
 
 	cancel()
 	time.Sleep(100 * time.Millisecond)

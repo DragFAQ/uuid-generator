@@ -2,36 +2,30 @@ package handler
 
 import (
 	"context"
-	"sync"
 	"time"
 
-	generator "github.com/DragFAQ/uuid-generator/generator"
+	hash "github.com/DragFAQ/uuid-generator/generator"
 	log "github.com/DragFAQ/uuid-generator/logger"
 	pb "github.com/DragFAQ/uuid-generator/proto"
 )
 
 type GrpcHandler struct {
-	logger      log.Logger
-	currentHash *generator.Hash
-	hashLock    *sync.RWMutex
+	logger log.Logger
 	pb.UnimplementedHashServiceServer
 }
 
-func NewGrpcHandler(currentHash *generator.Hash, hashLock *sync.RWMutex, logger log.Logger) *GrpcHandler {
+func NewGrpcHandler(logger log.Logger) *GrpcHandler {
 	return &GrpcHandler{
-		logger:      logger,
-		currentHash: currentHash,
-		hashLock:    hashLock,
+		logger: logger,
 	}
 }
 
-func (h *GrpcHandler) GetCurrentHash(ctx context.Context, r *pb.HashRequest) (*pb.HashResponse, error) {
-	h.hashLock.RLock()
-	defer h.hashLock.RUnlock()
+func (h *GrpcHandler) GetCurrentHash(_ context.Context, _ *pb.HashRequest) (*pb.HashResponse, error) {
+	currentHash := hash.GetHash()
 
 	resp := &pb.HashResponse{
-		Hash:           h.currentHash.Value,
-		GenerationTime: h.currentHash.GenerationTime.Format(time.RFC3339),
+		Hash:           currentHash.Value,
+		GenerationTime: currentHash.GenerationTime.Format(time.RFC3339),
 	}
 
 	return resp, nil

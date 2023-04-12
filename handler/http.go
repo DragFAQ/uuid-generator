@@ -3,7 +3,6 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
-	"sync"
 	"time"
 
 	hash "github.com/DragFAQ/uuid-generator/generator"
@@ -11,26 +10,20 @@ import (
 )
 
 type HttpHandler struct {
-	logger      log.Logger
-	currentHash *hash.Hash
-	hashLock    *sync.RWMutex
+	logger log.Logger
 }
 
-func NewHttpHandler(currentHash *hash.Hash, hashLock *sync.RWMutex, logger log.Logger) *HttpHandler {
+func NewHttpHandler(logger log.Logger) *HttpHandler {
 	return &HttpHandler{
-		logger:      logger,
-		currentHash: currentHash,
-		hashLock:    hashLock,
+		logger: logger,
 	}
 }
 
-func (h *HttpHandler) GetCurrentHash(w http.ResponseWriter, r *http.Request) {
-	h.hashLock.RLock()
-	defer h.hashLock.RUnlock()
-
+func (h *HttpHandler) GetCurrentHash(w http.ResponseWriter, _ *http.Request) {
+	currentHash := hash.GetHash()
 	resp := map[string]string{
-		"hash":            h.currentHash.Value,
-		"generation_time": h.currentHash.GenerationTime.Format(time.RFC3339),
+		"hash":            currentHash.Value,
+		"generation_time": currentHash.GenerationTime.Format(time.RFC3339),
 	}
 
 	jsonResp, err := json.Marshal(resp)
