@@ -33,11 +33,9 @@ func failOnError(logger log.Logger, err error, msg string) {
 	}
 }
 
-func setUpSignalHandler(ctx context.Context, wg *sync.WaitGroup, logger log.Logger, httpServer *http.Server, grpcServer *grpc.Server, cancel context.CancelFunc) {
+func setUpSignalHandler(ctx context.Context, wg *sync.WaitGroup, logger log.Logger, httpServer *http.Server, grpcServer *grpc.Server, cancel context.CancelFunc, stop chan os.Signal) {
 	wg.Add(1)
 	go func() {
-		stop := make(chan os.Signal, 1)
-		signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 		sig := <-stop
 		logger.Infof("shutting down (%v)", sig)
 
@@ -49,22 +47,24 @@ func setUpSignalHandler(ctx context.Context, wg *sync.WaitGroup, logger log.Logg
 	}()
 }
 
-func startHTTPServer(wg *sync.WaitGroup, port string, logger log.Logger) *http.Server {
+func startHTTPServer(wg *sync.WaitGroup, port string, logger log.Logger, stop chan os.Signal) *http.Server {
 	httpHandler := handler.NewHttpHandler(&currentHash, &hashLock, logger)
 	http.HandleFunc("/", httpHandler.GetCurrentHash)
 
 	srv := &http.Server{Addr: ":" + port}
+	wg.Add(1)
 	go func() {
 		defer wg.Done()
 
 		err := srv.ListenAndServe()
 		failOnError(logger, err, "Failed to start HTTP server")
+		stop <- os.Kill
 	}()
 
 	return srv
 }
 
-func startGRPCServer(wg *sync.WaitGroup, port string, logger log.Logger) *grpc.Server {
+func startGRPCServer(wg *sync.WaitGroup, port string, logger log.Logger, stop chan os.Signal) *grpc.Server {
 	srv := grpc.NewServer()
 
 	grpcHandler := handler.NewGrpcHandler(&currentHash, &hashLock, logger)
@@ -79,6 +79,7 @@ func startGRPCServer(wg *sync.WaitGroup, port string, logger log.Logger) *grpc.S
 
 		err = srv.Serve(listener)
 		failOnError(logger, err, "Failed to start GRPC server")
+		stop <- os.Kill
 	}()
 
 	return srv
@@ -104,19 +105,22 @@ func Run() *cobra.Command {
 			}
 
 			ctx, cancel := context.WithCancel(context.Background())
+			stop := make(chan os.Signal, 4)
+			signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 
 			wg := &sync.WaitGroup{}
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
 				generator.GenerateHash(&currentHash, &hashLock, logger, conf.Settings.HashTTLSeconds, ctx)
+				stop <- os.Kill
 			}()
 
-			httpServer := startHTTPServer(wg, conf.Server.HttpPort, logger)
+			httpServer := startHTTPServer(wg, conf.Server.HttpPort, logger, stop)
 
-			grpcServer := startGRPCServer(wg, conf.Server.GrpcPort, logger)
+			grpcServer := startGRPCServer(wg, conf.Server.GrpcPort, logger, stop)
 
-			setUpSignalHandler(ctx, wg, logger, httpServer, grpcServer, cancel)
+			setUpSignalHandler(ctx, wg, logger, httpServer, grpcServer, cancel, stop)
 
 			wg.Wait()
 			logger.Infof("program terminated gracefully")
